@@ -5,16 +5,20 @@
 
 /**
  * @class
+ * @param {number} id
+ * @param {string} name
+ * @param {?Type} input
+ * @param {?Type} output
  */
-function Signature() {
+function Signature(id, name, input, output) {
 	/** @member {number} */
-	this.id = 0
+	this.id = id
 	/** @member {string} */
-	this.name = ''
-	/** @member {Type} */
-	this.input = null
-	/** @member {Type} */
-	this.output = null
+	this.name = name
+	/** @member {?Type} */
+	this.input = input
+	/** @member {?Type} */
+	this.output = output
 }
 
 module.exports = Signature

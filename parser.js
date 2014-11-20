@@ -1,7 +1,9 @@
 /**
  * @file Parse a signature string
  * <signature>:
- *     <name><input><output>
+ *     <id> <name><input><output>
+ *
+ * <id>: '#' \d+
  *
  * <name>: \w+
  *
@@ -26,20 +28,24 @@
  *     'boolean'
  *     'json'
  *     'oid'
- *     'regexp'
+ *     'regex'
+ *     'date'
  *
  * <object>:
  *     <field> ', ' <object>
  *     <field>
  *
  * <field>:
- *     <field_name> '[]: (' <object> ')'
- *     <field_name> '[]: ' <basic>
- *     <field_name> ': ' <basic>
+ *     <field_name> '[]: ' <field_type>
+ *     <field_name> ': ' <field_type>
  *
  * <field_name>:
  *     <name> '?'
  *     <name>
+ *
+ * <field_type>:
+ *     <basic>
+ *     '(' <object> ')'
  */
 'use strict'
 
@@ -56,7 +62,7 @@ var nonTerminals = Object.create(null),
  * @returns {?Signature}
  */
 module.exports = function (str) {
-	parse('signature', str)
+	return parse('signature', str)
 }
 
 /**
@@ -157,14 +163,17 @@ function regex(rg) {
 	}
 }
 
-// <name><input><output>
+// <id> <name><input><output>
+// Signature
 createNT('signature', function (t) {
-	var signature = new Signature
-	signature.name = t.els[0]
-	signature.input = t.els[1]
-	signature.output = t.els[2]
-	return signature
-}, ['name', 'input', 'output'])
+	return new Signature(t.els[0], t.els[2], t.els[3], t.els[4])
+}, ['id', char(' '), 'name', 'input', 'output'])
+
+// '#' \d+
+// number
+createNT('id', function (t) {
+	return Number(t.els[1])
+}, [char('#'), regex(/\d+/)])
 
 // \w+
 // string
@@ -190,11 +199,11 @@ createNT('type', function (t) {
 	return t.els[0]
 }, 'basic', 'object')
 
-// 'uint' | 'int' | 'float' | 'string' | 'Buffer' | 'boolean' | 'json' | 'oid' | 'regexp'
+// 'uint' | 'int' | 'float' | 'string' | 'Buffer' | 'boolean' | 'json' | 'oid' | 'regex' | 'date'
 // Type
 createNT('basic', function (t) {
 	return new Type(Type[t.els[0].toUpperCase()])
-}, string('uint'), string('int'), string('float'), string('string'), string('Buffer'), string('boolean'), string('json'), string('oid'), string('regexp'))
+}, string('uint'), string('int'), string('float'), string('string'), string('Buffer'), string('boolean'), string('json'), string('oid'), string('regex'), string('date'))
 
 // <field> ', ' <object> | <field>
 // Type
@@ -209,7 +218,7 @@ createNT('object', function (t) {
 	}
 }, ['field', string(', '), 'object'], 'field')
 
-// <field_name> '[]: (' <object> ')' | <field_name> '[]: ' <basic> | <field_name> ': ' <basic>
+// <field_name> '[]: ' <field_type> | <field_name> ': ' <field_type>
 // Field
 createNT('field', function (t) {
 	var field = new Field()
@@ -218,7 +227,7 @@ createNT('field', function (t) {
 	field.array = t.els[1].indexOf('[]') !== -1
 	field.type = t.els[2]
 	return field
-}, ['field_name', string('[]: ('), 'object', char(')')], ['field_name', string('[]: '), 'basic'], ['field_name', string(': '), 'basic'])
+}, ['field_name', string('[]: '), 'field_type'], ['field_name', string(': '), 'field_type'])
 
 // <name> '?' | <name>
 // {name: string, optional: boolean}
@@ -228,3 +237,9 @@ createNT('field_name', function (t) {
 		optional: t.els.length === 2
 	}
 }, ['name', char('?')], 'name')
+
+// <basic> | '(' <object> ')'
+// Type
+createNT('field_type', function (t) {
+	return t.els[1] || t.els[0]
+}, 'basic', [char('('), 'object', char(')')])
