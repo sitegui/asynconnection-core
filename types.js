@@ -17,9 +17,9 @@ var MAX_DOUBLE_INT = POW[53],
 	MAX_UINT8 = POW[7],
 	MAX_UINT16 = POW[14],
 	MAX_UINT32 = POW[29],
-	MIN_INT8 = POW[6],
-	MIN_INT16 = POW[13],
-	MIN_INT32 = POW[28]
+	MAX_INT8 = POW[6],
+	MAX_INT16 = POW[13],
+	MAX_INT32 = POW[28]
 
 /*
  * Formats (big-endian):
@@ -59,16 +59,16 @@ module.exports.int = {
 			throw new TypeError('Expected signed integer at ' + path)
 		}
 
-		if (i >= MIN_INT8 && i < -MIN_INT8) {
+		if (i >= -MAX_INT8 && i < MAX_INT8) {
 			data.writeUInt8(i & 0x7f)
-		} else if (i >= MIN_INT16 && i < -MIN_INT16) {
-			data.writeUInt16((i & 0x3fff) | 0x8000)
-		} else if (i >= MIN_INT32 && i < -MIN_INT32) {
-			data.writeUInt32((i & 0x1fffffff) | 0xc0000000)
+		} else if (i >= -MAX_INT16 && i < MAX_INT16) {
+			data.writeUInt16((i & 0x3fff) + 0x8000)
+		} else if (i >= -MAX_INT32 && i < MAX_INT32) {
+			data.writeUInt32((i & 0x1fffffff) + 0xc0000000)
 		} else {
 			// Split in two 32b uints
-			data.writeUInt32((Math.floor(i / POW[32]) & 0x1fffffff) | 0xe0000000)
-			data.writeUInt32(i | 0)
+			data.writeUInt32((Math.floor(i / POW[32]) & 0x1fffffff) + 0xe0000000)
+			data.writeUInt32(i >>> 0)
 		}
 	}
 }
