@@ -35,23 +35,47 @@
  */
 'use strict'
 
-var Data = require('./Data'),
-	ReadState = require('./ReadState'),
-	types = require('./types')
+var ReadState = require('./ReadState'),
+	Data, ReadState, Field
 
 /**
+ * Create a type, given the format. The format can be either:
+ * A basic type, one of:
+ *     'uint', 'int', 'float', 'string', 'Buffer', 'boolean', 'json', 'oid', 'regex', 'date'
+ * A compound type: an object, like:
+ *     {a: 'int', b: ['int'], c: [{'d?': 'string'}]}
+ * In the example above, 'b' is a an array of integers, 'd' is an optional field
  * @class
- * @param {string} type
+ * @param {string|Object} type
  */
 function Type(type) {
-	/** @member {string} */
-	this.type = type
+	if (typeof type === 'string') {
+		if (Type.basicTypes.indexOf(type) === -1) {
+			throw new TypeError('Unknown basic type: ' + type)
+		}
+
+		/** @member {string} */
+		this.type = type
+		return
+	}
+
+	if (!type || typeof type !== 'object') {
+		throw new TypeError('Invalid type: ' + type)
+	}
+
+	this.type = Type.OBJECT
 
 	/** @member {Array<Field>} */
-	this.fields = null
+	this.fields = Object.keys(type).map(function (name) {
+		return new Field(name, type[name])
+	})
 }
 
 module.exports = Type
+
+Data = require('./Data')
+ReadState = require('./ReadState')
+Field = require('./Field')
 
 Type.UINT = 'uint'
 Type.INT = 'int'
@@ -64,6 +88,18 @@ Type.OID = 'oid'
 Type.REGEX = 'regex'
 Type.DATE = 'date'
 Type.OBJECT = 'object'
+Type.basicTypes = [
+	Type.UINT,
+	Type.INT,
+	Type.FLOAT,
+	Type.STRING,
+	Type.BUFFER,
+	Type.BOOLEAN,
+	Type.JSON,
+	Type.OID,
+	Type.REGEX,
+	Type.DATE
+]
 
 /**
  * @param {*} value
