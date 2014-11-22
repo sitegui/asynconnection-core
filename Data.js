@@ -62,6 +62,15 @@ Data.prototype.writeUInt32 = function (value) {
 }
 
 /**
+ * @param {number} value
+ */
+Data.prototype.writeDouble = function (value) {
+	this._alloc(8)
+	this._buffer.writeDoubleBE(value, this._length)
+	this._length += 8
+}
+
+/**
  * Return the data as a Buffer.
  * Note: the returned Buffer and the internal Buffer share the same memory
  * @return {Buffer}
