@@ -50,7 +50,7 @@ module.exports.uint = {
 		var firstByte = state.peekUInt8()
 
 		if (!(firstByte & 0x80)) {
-			state.offset++
+			state._offset++
 			return firstByte
 		} else if (!(firstByte & 0x40)) {
 			return state.readUInt16() - 0x8000
@@ -89,7 +89,7 @@ module.exports.int = {
 			i
 
 		if (!(firstByte & 0x80)) {
-			state.offset++
+			state._offset++
 			return (firstByte & 0x40) ? (firstByte | 0xffffff80) : firstByte
 		} else if (!(firstByte & 0x40)) {
 			i = state.readUInt16() - 0x8000
@@ -114,6 +114,9 @@ module.exports.float = {
 			throw new TypeError('Expected a number at ' + path + ', got ' + f)
 		}
 		data.writeDouble(f)
+	},
+	read: function (state) {
+		return state.readDouble()
 	}
 }
 
@@ -126,7 +129,10 @@ module.exports.string = {
 			throw new TypeError('Expected a string at ' + path + ', got ' + s)
 		}
 
-		module.exports.Buffer.write(new Buffer(s), data, path)
+		exports.Buffer.write(new Buffer(s), data, path)
+	},
+	read: function (state) {
+		return exports.Buffer.read(state).toString()
 	}
 }
 
@@ -138,8 +144,12 @@ module.exports.Buffer = {
 		if (!Buffer.isBuffer(B)) {
 			throw new TypeError('Expected a Buffer at ' + path + ', got ' + B)
 		}
-		module.exports.uint.write(B.length, data, path)
+		exports.uint.write(B.length, data, path)
 		data.appendBuffer(B)
+	},
+	read: function (state) {
+		var length = exports.uint.read(state)
+		return state.readBuffer(length)
 	}
 }
 
@@ -152,6 +162,13 @@ module.exports.boolean = {
 			throw new TypeError('Expected a boolean at ' + path + ', got ' + b)
 		}
 		data.writeUInt8(b ? 1 : 0)
+	},
+	read: function (state) {
+		var b = state.readUInt8()
+		if (b > 1) {
+			throw new Error('Invalid boolean value')
+		}
+		return Boolean(b)
 	}
 }
 
@@ -160,7 +177,10 @@ module.exports.boolean = {
  */
 module.exports.json = {
 	write: function (j, data, path) {
-		module.exports.string.write(JSON.stringify(j), data, path)
+		exports.string.write(JSON.stringify(j), data, path)
+	},
+	read: function (state) {
+		return JSON.parse(exports.string.read(state))
 	}
 }
 
@@ -174,6 +194,9 @@ module.exports.oid = {
 			throw new TypeError('Expected an object id (12 bytes) at ' + path + ', got ' + o)
 		}
 		data.appendBuffer(buffer)
+	},
+	read: function (state) {
+		return state.readBuffer(12).toString('hex')
 	}
 }
 
@@ -187,11 +210,19 @@ module.exports.regex = {
 		if (!(r instanceof RegExp)) {
 			throw new TypeError('Expected an instance of RegExp at ' + path + ', got ' + r)
 		}
-		module.exports.string.write(r.source, data, path)
+		exports.string.write(r.source, data, path)
 		g = r.global ? 1 : 0
 		i = r.ignoreCase ? 2 : 0
 		m = r.multiline ? 4 : 0
 		data.writeUInt8(g + i + m)
+	},
+	read: function (state) {
+		var source = exports.string.read(state),
+			flags = state.readUInt8(),
+			g = flags & 0x1 ? 'g' : '',
+			i = flags & 0x2 ? 'i' : '',
+			m = flags & 0x4 ? 'm' : ''
+		return new RegExp(source, g + i + m)
 	}
 }
 
@@ -205,6 +236,9 @@ module.exports.date = {
 		} else if (isNaN(d.getTime())) {
 			throw new TypeError('Expected a valid Date at ' + path + ', got ' + d)
 		}
-		module.exports.uint.write(d.getTime(), data, path)
+		exports.uint.write(d.getTime(), data, path)
+	},
+	read: function (state) {
+		return new Date(exports.utin.read(state))
 	}
 }

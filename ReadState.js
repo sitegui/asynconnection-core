@@ -6,10 +6,16 @@
  * @param {Buffer} buffer
  */
 function ReadState(buffer) {
-	/** @member {Buffer} */
-	this.buffer = buffer
-	/** @member {number} */
-	this.offset = 0
+	/**
+	 * @member {Buffer}
+	 * @private
+	 */
+	this._buffer = buffer
+	/**
+	 * @member {number}
+	 * @private
+	 */
+	this._offset = 0
 }
 
 module.exports = ReadState
@@ -19,7 +25,7 @@ module.exports = ReadState
  * @returns {number}
  */
 ReadState.prototype.peekUInt8 = function () {
-	return this.buffer.readUInt8(this.offset)
+	return this._buffer.readUInt8(this._offset)
 }
 
 /**
@@ -27,15 +33,15 @@ ReadState.prototype.peekUInt8 = function () {
  * @returns {number}
  */
 ReadState.prototype.readUInt8 = function () {
-	return this.buffer.readUInt8(this.offset++)
+	return this._buffer.readUInt8(this._offset++)
 }
 
 /**
  * @returns {number}
  */
 ReadState.prototype.readUInt16 = function () {
-	var r = this.buffer.readUInt16BE(this.offset)
-	this.offset += 2
+	var r = this._buffer.readUInt16BE(this._offset)
+	this._offset += 2
 	return r
 }
 
@@ -43,7 +49,36 @@ ReadState.prototype.readUInt16 = function () {
  * @returns {number}
  */
 ReadState.prototype.readUInt32 = function () {
-	var r = this.buffer.readUInt32BE(this.offset)
-	this.offset += 4
+	var r = this._buffer.readUInt32BE(this._offset)
+	this._offset += 4
 	return r
+}
+
+/**
+ * @returns {number}
+ */
+ReadState.prototype.readDouble = function () {
+	var r = this._buffer.readDoubleBE(this._offset)
+	this._offset += 8
+	return r
+}
+
+/**
+ * @param {number} length
+ * @returns {Buffer}
+ */
+ReadState.prototype.readBuffer = function (length) {
+	if (this._offset + length > this._buffer.length) {
+		throw new RangeError('Trying to access beyond buffer length')
+	}
+	var r = this._buffer.slice(this._offset, this._offset + length)
+	this._offset += length
+	return r
+}
+
+/**
+ * @return {boolean}
+ */
+ReadState.prototype.hasEnded = function () {
+	return this._offset === this._buffer.length
 }

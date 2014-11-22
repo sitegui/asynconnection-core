@@ -47,6 +47,6 @@ function write(type, value) {
 function read(hexStr, type) {
 	var state = new ReadState(new Buffer(hexStr, 'hex')),
 		r = type.read(state)
-	state.offset.should.be.equal(state.buffer.length)
+	state.hasEnded().should.be.true
 	return r
 }
