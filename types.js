@@ -239,6 +239,6 @@ module.exports.date = {
 		exports.uint.write(d.getTime(), data, path)
 	},
 	read: function (state) {
-		return new Date(exports.utin.read(state))
+		return new Date(exports.uint.read(state))
 	}
 }

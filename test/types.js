@@ -1,9 +1,9 @@
 /*globals describe, it*/
 'use strict'
 
-require('should')
 var types = require('../types'),
 	Data = require('../Data'),
+	should = require('should'),
 	ReadState = require('../ReadState'),
 	uintValues = require('./uint.json'),
 	intValues = require('./int.json')
@@ -25,6 +25,60 @@ describe('types', function () {
 			encoded.should.be.equal(intValues[value])
 			read(encoded, types.int).should.be.equal(value)
 		})
+	})
+
+	it('should be sound for float', function () {
+		check(types.float, 0)
+		check(types.float, 3.14)
+		check(types.float, -Math.E)
+		check(types.float, Infinity)
+		check(types.float, -Infinity)
+		check(types.float, 1 / Infinity)
+		check(types.float, -1 / Infinity)
+		check(types.float, NaN)
+	})
+
+	it('should be sound for string', function () {
+		check(types.string, '')
+		check(types.string, 'Hello World')
+		check(types.string, '\u0000 Ūnĭcōde \uD83D\uDC04')
+	})
+
+	it('should be sound for Buffer', function () {
+		check(types.Buffer, new Buffer([]))
+		check(types.Buffer, new Buffer([3, 14, 15, 92, 65, 35]))
+	})
+
+	it('should be sound for boolean', function () {
+		check(types.boolean, true)
+		check(types.boolean, false)
+	})
+
+	it('should be sound for json', function () {
+		check(types.json, true)
+		check(types.json, 17)
+		check(types.json, null)
+		check(types.json, 'Hello')
+		check(types.json, [true, 17, null, 'Hi'])
+		check(types.json, {
+			a: 2,
+			b: {
+				c: ['hi']
+			}
+		})
+	})
+
+	it('should be sound for object id', function () {
+		check(types.oid, '123456789012345678901234')
+	})
+
+	it('should be sound for regex', function () {
+		check(types.regex, /my-regex/)
+		check(types.regex, /^\.{3,}[\]\[2-5-]|(?:2)$/ig)
+	})
+
+	it('should be sound for date', function () {
+		check(types.date, new Date)
 	})
 })
 
@@ -49,4 +103,12 @@ function read(hexStr, type) {
 		r = type.read(state)
 	state.hasEnded().should.be.true
 	return r
+}
+
+/**
+ * @param {Object} type
+ * @param {*} value
+ */
+function check(type, value) {
+	should(read(write(type, value), type)).be.eql(value)
 }
