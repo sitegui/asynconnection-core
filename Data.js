@@ -89,6 +89,7 @@ Data.prototype._alloc = function (bytes) {
 		newBuffer
 
 	if (this._length + bytes > buffLen) {
+		console.log('REALLOC!!!', this._length, bytes, buffLen)
 		do {
 			buffLen *= 2
 		} while (this._length + bytes > buffLen)
