@@ -7,32 +7,46 @@
  */
 function Context() {
 	/**
-	 * A map from call id and call name to signature
-	 * @member {Object<Call>}
+	 * @member {Object}
+	 * @property {Object} client
+	 * @property {Object<Call>} client.map
+	 * @property {Array<Call>} client.list
+	 * @property {Object} server
+	 * @property {Object<Call>} server.map
+	 * @property {Array<Call>} server.list
 	 * @private
 	 */
-	this._clientCalls = Object.create(null)
+	this._calls = {
+		client: {
+			map: Object.create(null),
+			list: []
+		},
+		server: {
+			map: Object.create(null),
+			list: []
+		}
+	}
 
 	/**
-	 * A map from call id and call name to signature
-	 * @member {Object<Call>}
+	 * @member {Object}
+	 * @property {Object} client
+	 * @property {Object<Message>} client.map
+	 * @property {Array<Message>} client.list
+	 * @property {Object} server
+	 * @property {Object<Message>} server.map
+	 * @property {Array<Message>} server.list
 	 * @private
 	 */
-	this._serverCalls = Object.create(null)
-
-	/**
-	 * A map from msg id and msg name to signature
-	 * @member {Object<Message>}
-	 * @private
-	 */
-	this._clientMessages = Object.create(null)
-
-	/**
-	 * A map from msg id and msg name to signature
-	 * @member {Object<Message>}
-	 * @private
-	 */
-	this._serverMessages = Object.create(null)
+	this._messages = {
+		client: {
+			map: Object.create(null),
+			list: []
+		},
+		server: {
+			map: Object.create(null),
+			list: []
+		}
+	}
 }
 
 module.exports = Context
@@ -49,13 +63,15 @@ var Call = require('./Call'),
  * @param {function(*,function(?Error,*))} [handler] - required in the server side
  */
 Context.prototype.addClientCall = function (id, name, input, output, handler) {
-	if (id in this._clientCalls) {
+	var map = this._calls.client.map,
+		list = this._calls.client.list
+	if (id in map) {
 		throw new Error('Client call id ' + id + ' is already in use')
-	} else if (name in this._clientCalls) {
+	} else if (name in map) {
 		throw new Error('Client call name ' + name + ' is already in use')
 	}
 
-	this._clientCalls[id] = this._clientCalls[name] = new Call(id, name, input, output, handler)
+	list.push(map[id] = map[name] = new Call(id, name, input, output, handler))
 }
 
 /**
@@ -67,13 +83,15 @@ Context.prototype.addClientCall = function (id, name, input, output, handler) {
  * @param {function(*,function(?Error,*))} [handler] - required in the client side
  */
 Context.prototype.addServerCall = function (id, name, input, output, handler) {
-	if (id in this._serverCalls) {
+	var map = this._calls.server.map,
+		list = this._calls.server.list
+	if (id in map) {
 		throw new Error('Server call id ' + id + ' is already in use')
-	} else if (name in this._serverCalls) {
+	} else if (name in map) {
 		throw new Error('Server call name ' + name + ' is already in use')
 	}
 
-	this._serverCalls[id] = this._serverCalls[name] = new Call(id, name, input, output, handler)
+	list.push(map[id] = map[name] = new Call(id, name, input, output, handler))
 }
 
 /**
@@ -84,13 +102,15 @@ Context.prototype.addServerCall = function (id, name, input, output, handler) {
  * @param {function(*)} [handler] - required in the server side
  */
 Context.prototype.addClientMessage = function (id, name, input, handler) {
-	if (id in this._clientMessages) {
+	var map = this._messages.client.map,
+		list = this._messages.client.list
+	if (id in map) {
 		throw new Error('Client message id ' + id + ' is already in use')
-	} else if (name in this._clientMessages) {
+	} else if (name in map) {
 		throw new Error('Client message name ' + name + ' is already in use')
 	}
 
-	this._clientMessages[id] = this._clientMessages[name] = new Message(id, name, input, handler)
+	list.push(map[id] = map[name] = new Message(id, name, input, handler))
 }
 
 /**
@@ -101,11 +121,13 @@ Context.prototype.addClientMessage = function (id, name, input, handler) {
  * @param {function(*)} [handler] - required in the client side
  */
 Context.prototype.addServerMessage = function (id, name, input, handler) {
-	if (id in this._serverMessages) {
+	var map = this._messages.server.map,
+		list = this._messages.server.list
+	if (id in map) {
 		throw new Error('Server message id ' + id + ' is already in use')
-	} else if (name in this._serverMessages) {
+	} else if (name in map) {
 		throw new Error('Server message name ' + name + ' is already in use')
 	}
 
-	this._serverMessages[id] = this._serverMessages[name] = new Message(id, name, input, handler)
+	list.push(map[id] = map[name] = new Message(id, name, input, handler))
 }

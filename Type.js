@@ -1,41 +1,6 @@
-/**
- * @file Parse and represent a type
- * Example:
- *
- * 'a: int, b[]: int, c[]: (d?: string)'
- * {
- * type: Type.OBJECT,
- * fields: [{
- * 	name: 'a',
- * 	type: {
- * 		type: Type.INT
- * 	}
- * }, {
- * 	name: 'b',
- * 	array: true,
- * 	type: {
- * 		type: Type.INT
- * 	}
- * }, {
- * 	name: 'c',
- * 	array: true,
- * 	type: {
- * 		type: Type.OBJECT,
- * 		fields: [{
- * 			name: 'd',
- * 			optional: true,
- * 			type: {
- * 				type: Type.STRING
- * 			}
- * 		}]
- * 	}
- * }]
- * }
- *
- */
 'use strict'
 
-var ReadState = require('./ReadState'),
+var types = require('./types'),
 	Data, ReadState, Field
 
 /**
@@ -87,7 +52,7 @@ Type.JSON = 'json'
 Type.OID = 'oid'
 Type.REGEX = 'regex'
 Type.DATE = 'date'
-Type.OBJECT = 'object'
+Type.OBJECT = '{object}'
 Type.basicTypes = [
 	Type.UINT,
 	Type.INT,
@@ -119,6 +84,37 @@ Type.prototype.write = function (value) {
  */
 Type.prototype.read = function (buffer) {
 	return this._read(new ReadState(buffer))
+}
+
+/**
+ * @return {Buffer}
+ * @private
+ */
+Type.prototype._getHash = function () {
+	var hash = new Data
+	hashType(this, false, false)
+	return hash.toBuffer()
+
+	/**
+	 * @param {Type} type
+	 * @param {boolean} array
+	 * @param {boolean} optional
+	 */
+	function hashType(type, array, optional) {
+		// Write type (first char + flags)
+		// AOxx xxxx
+		hash.writeUInt8((type.type[0] & 0x3f) | (array ? 0x80 : 0) | (optional ? 0x40 : 0))
+
+		if (type.type !== Type.OBJECT) {
+			// Basic type: done
+			return
+		}
+
+		types.uint.write(type.fields.length, hash)
+		type.fields.forEach(function (field) {
+			hashType(field.type, field.array, field.optional)
+		})
+	}
 }
 
 /**

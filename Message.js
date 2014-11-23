@@ -25,3 +25,11 @@ function Message(id, name, input, handler) {
 module.exports = Message
 
 Type = require('./Type')
+
+/**
+ * @return {Buffer}
+ * @private
+ */
+Message.prototype._getHash = function () {
+	return this.input ? this.input._getHash() : new Buffer(0)
+}
