@@ -1,5 +1,7 @@
 'use strict'
 
+var FrameEncoder
+
 /**
  * @class
  * @extends EventEmitter
@@ -44,6 +46,12 @@ function Peer(calls, messages, auth, connection) {
 	 * @readonly
 	 */
 	this.closed = false
+
+	/**
+	 * @member {boolean}
+	 * @readonly
+	 */
+	this.handshakeDone = false
 
 	/**
 	 * @member {Object}
@@ -92,16 +100,28 @@ function Peer(calls, messages, auth, connection) {
 	}
 
 	/**
-	 * @member {boolean}
-	 * @private
-	 */
-	this._handshakeDone = false
-
-	/**
 	 * @member {Connection}
 	 * @private
 	 */
 	this._connection = connection
+
+	/**
+	 * @member {FrameEncoder}
+	 * @private
+	 */
+	this._encoder = new FrameEncoder(this, connection)
+
+	/**
+	 * @typedef {Object} Peer~PendingCall
+	 * @property {Function} callback
+	 * @property {?Timer} timer - timeout timer
+	 */
+
+	/**
+	 * @member {Array<Peer~PendingCall>}
+	 * @private
+	 */
+	this._pendingCalls = []
 
 	// Set up listeners
 	connection.on('frame', this._processFrame.bind(this))
@@ -114,27 +134,19 @@ function Peer(calls, messages, auth, connection) {
 require('util').inherits(Peer, require('events').EventEmitter)
 module.exports = Peer
 
-var Type = require('./Type')
+var Data = require('./Data'),
+	types = require('./types')
+FrameEncoder = require('./FrameEncoder')
 
 /**
- * @property {Type}
- * @private
+ * Protocol errors
+ * @enum {number}
  */
-Peer._handshake = new Type({
-	auth: {
-		user: 'string',
-		password: 'string',
-		required: 'boolean'
-	},
-	calls: [{ // local calls
-		id: 'uint',
-		hash: 'Buffer'
-	}],
-	messages: [{ // local messages
-		id: 'uint',
-		hash: 'Buffer'
-	}]
-})
+Peer.ERROR = {
+	OTHER: 0,
+	TIMEOUT: -1,
+	CLOSED: -2
+}
 
 /**
  * Check if the remote can answer to a call
@@ -146,13 +158,66 @@ Peer.prototype.canCall = function (name) {
 
 /**
  * Make a call to the other side (remote)
+ * The callback will be executed asynchronously and only once
+ * Making an unsupported call is considered error
+ * If the remote answers the call after the timeout has fired, the response will be ignored
+ * If no response is expected, you should send messages, not make calls!
+ * All errors related to this call will be routed to the callback (including invalid input format)
+ * One can check if the error was raised locally or by the remote (as a response) by checking the `isLocal` flag in the Error object
  * @param {string} name - call name
  * @param {*} [data=null] - must follow the call input format
- * @param {number} [timeout=10e3] - call timeout in ms
+ * @param {number} [timeout=10e3] - call timeout in ms (0 means no timeout)
  * @param {function(?Error,*)} callback - required
  */
 Peer.prototype.call = function (name, data, timeout, callback) {
+	var that = this
 
+	if (typeof data === 'function') {
+		callback = data
+		data = null
+		timeout = 10e3
+	} else if (typeof timeout === 'function') {
+		callback = timeout
+		timeout = 10e3
+	} else if (typeof callback !== 'function') {
+		throw new TypeError('A callback must be supplied. ' +
+			'If no response is expected, you should send messages, not make calls')
+	}
+	data = data === undefined ? null : data
+
+	var localCall = this._calls.local.map[name]
+	if (this.closed) {
+		return asyncError('Connection is closed', Peer.ERROR.CLOSED)
+	} else if (!localCall) {
+		return asyncError('Local call ' + name + ' not found. Have you added it?', Peer.ERROR.OTHER)
+	} else if (!this.canCall(name)) {
+		return asyncError('The remote does not give support for call ' + name, Peer.ERROR.OTHER)
+	} else if (localCall.input && data === null) {
+		return asyncError('This call expects some input, null was given', Peer.ERROR.OTHER)
+	} else if (!localCall.input && data !== null) {
+		return asyncError('This call does not expect input, but got ' + data, Peer.ERROR.OTHER)
+	}
+
+	// Encode the data
+	try {
+		data = data === null ? new Buffer(0) : localCall.input.write(data)
+	} catch (e) {
+		return asyncError(e.message, Peer.ERROR.OTHER)
+	}
+
+	this._doCall(localCall.id, data, timeout, callback)
+
+	/**
+	 * Mixing async and sync is a bad idea, so we make sure the callback is called async-ly
+	 * @param {string} message
+	 * @param {number} code
+	 */
+	function asyncError(message, code) {
+		var err = that._createLocalError(message, code)
+		process.nextTick(function () {
+			callback(err)
+		})
+	}
 }
 
 /**
@@ -173,22 +238,60 @@ Peer.prototype.send = function (name, data) {
 }
 
 /**
+ * @param {number} id
+ * @param {Buffer} data
+ * @param {number} timeout
+ * @param {Function} callback
+ * @private
+ */
+Peer.prototype._doCall = function (id, data, timeout, callback) {
+	var sequenceId = this._pendingCalls.length,
+		frame = new Data,
+		timer
+
+	// Create the call frame
+	// 0x00 <sid:uint> <id:uint> <data>
+	frame.writeUInt8(0)
+	types.uint.write(sequenceId, frame)
+	types.uint.write(id, frame)
+	frame.appendBuffer(data)
+	this._connection.sendFrame(frame.toBuffer())
+
+	// Set timeout
+	if (timeout) {
+		timer = setTimeout(this._timeoutCall.bind(this, sequenceId), timeout)
+	}
+
+	// Save call data
+	this._pendingCalls.push({
+		callback: callback,
+		timer: timer
+	})
+}
+
+/**
+ * Process the timeout of a call
+ * @param {number} sid - sequential id
+ * @private
+ */
+Peer.prototype._timeoutCall = function (sid) {
+	var pendingCall = this._pendingCalls[sid]
+	if (pendingCall) {
+		delete this._pendingCalls[sid]
+		pendingCall.callback(this._createLocalError('Timed out', Peer.ERROR.TIMEOUT))
+	}
+}
+
+/**
  * @param {Buffer} frame
  * @private
  */
 Peer.prototype._processFrame = function (frame) {
-	var data
-
-	if (!this._handshakeDone) {
-		try {
-			data = Peer._handshake.read(frame)
-		} catch (e) {
-			return this._error(e)
-		}
-		return this._processHandshake(data)
+	try {
+		this._encoder.processFrame(frame)
+	} catch (e) {
+		return this._error(e)
 	}
-
-
 }
 
 /**
@@ -201,11 +304,33 @@ Peer.prototype._error = function (error) {
 }
 
 /**
+ * @param {string} message
+ * @param {number} code - protocol errors are negative
+ * @return {Error}
+ * @private
+ */
+Peer.prototype._createLocalError = function (message, code) {
+	var err = new Error(message)
+	err.isLocal = true
+	err.code = code
+	return err
+}
+
+/**
  * @private
  */
 Peer.prototype._close = function () {
 	this._connection.close()
-	this.closed = true
+	if (!this.closed) {
+		this.closed = true
+
+		// Send closed error to all pending calls
+		this._pendingCalls.forEach(function (pendingCall) {
+			pendingCall.callback(this._createLocalError('Connection has closed', Peer.ERROR.CLOSED))
+			pendingCall.timer && clearTimeout(pendingCall.timer)
+		}, this)
+		this._pendingCalls = []
+	}
 }
 
 /**
@@ -214,35 +339,15 @@ Peer.prototype._close = function () {
  * @private
  */
 Peer.prototype._sendHandshake = function () {
-	var data = {
-		auth: {
-			user: this.auth.user,
-			password: this.auth.password,
-			required: this.auth.required
-		},
-		calls: this._calls.remote.list.map(function (call) {
-			return {
-				id: call.id,
-				hash: call.hash
-			}
-		}),
-		messages: this._messages.remote.list.map(function (message) {
-			return {
-				id: message.id,
-				hash: message.hash
-			}
-		})
-	}
-
 	try {
-		this._connection.sendFrame(Peer._handshake.write(data))
+		this._encoder.doHandshake(this.auth, this._calls.remote.list, this._messages.remote.list)
 	} catch (e) {
 		this._error(e)
 	}
 }
 
 /**
- * Process incoming handshake data
+ * Process incoming handshake data (called by FrameEncoder)
  * @param {Object} data
  * @param {Object} data.auth
  * @param {string} data.auth.user
@@ -284,6 +389,8 @@ Peer.prototype._processHandshake = function (data) {
 		}
 	}, this)
 
+	this.handshakeDone = true
+
 	/**
 	 * @param {Buffer} a
 	 * @param {Buffer} b
@@ -301,4 +408,46 @@ Peer.prototype._processHandshake = function (data) {
 		}
 		return true
 	}
+}
+
+/**
+ * Process incoming call (called by FrameEncoder)
+ * @param {number} sid
+ * @param {number} id
+ * @param {ReadState} data
+ * @private
+ */
+Peer.prototype._processCall = function (sid, id, data) {
+
+}
+
+/**
+ * Process incoming message (called by FrameEncoder)
+ * @param {number} id
+ * @param {ReadState} data
+ * @private
+ */
+Peer.prototype._processMessage = function (id, data) {
+
+}
+
+/**
+ * Process incoming call success response (called by FrameEncoder)
+ * @param {number} sid
+ * @param {ReadState} data
+ * @private
+ */
+Peer.prototype._processResponse = function (sid, data) {
+
+}
+
+/**
+ * Process incoming call error response (called by FrameEncoder)
+ * @param {number} sid
+ * @param {string} reason
+ * @param {number} code
+ * @private
+ */
+Peer.prototype._processError = function (sid, reason, code) {
+
 }

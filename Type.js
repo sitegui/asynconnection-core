@@ -78,12 +78,12 @@ Type.prototype.write = function (value) {
 }
 
 /**
- * @param {Buffer} buffer
+ * @param {Buffer|ReadState} data
  * @return {*}
  * @throws - if fails
  */
-Type.prototype.read = function (buffer) {
-	return this._read(new ReadState(buffer))
+Type.prototype.read = function (data) {
+	return this._read(data instanceof ReadState ? data : new ReadState(data))
 }
 
 /**
