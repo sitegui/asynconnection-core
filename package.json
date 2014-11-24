@@ -15,9 +15,11 @@
 		"node": ">=0.10"
 	},
 	"scripts": {
-		"test": "mocha test"
+		"test": "mocha test",
+		"doc": "jsdoc -p ."
 	},
 	"devDependencies": {
+		"jsdoc": "^3.3.0-alpha10",
 		"mocha": "^2.0.1",
 		"should": "^4.3.0"
 	}

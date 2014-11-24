@@ -16,10 +16,21 @@ function Message(id, name, input, handler) {
 		throw new TypeError('Invalid name ' + name + ', expected a string')
 	}
 
+	/** @member {number} */
 	this.id = id
+	/** @member {string} */
 	this.name = name
+	/** @member {?Type} */
 	this.input = input ? new Type(input) : null
+	/** @member {?Function} */
 	this.handler = handler
+
+	/**
+	 * Hash that is used to check peer compatibility
+	 * @member {Buffer}
+	 * @readonly
+	 */
+	this.hash = this._getHash()
 }
 
 module.exports = Message

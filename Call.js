@@ -17,14 +17,23 @@ function Call(id, name, input, output, handler) {
 		throw new TypeError('Invalid name ' + name + ', expected a string')
 	}
 
+	/** @member {number} */
 	this.id = id
+	/** @member {string} */
 	this.name = name
+	/** @member {?Type} */
 	this.input = input ? new Type(input) : null
+	/** @member {?Type} */
 	this.output = output ? new Type(output) : null
+	/** @member {?Function} */
 	this.handler = handler
 
-	// Create the hash that will be used to check peer compatibility
-	this._hash = this._getHash()
+	/**
+	 * Hash that is used to check peer compatibility
+	 * @member {Buffer}
+	 * @readonly
+	 */
+	this.hash = this._getHash()
 }
 
 module.exports = Call
