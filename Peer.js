@@ -114,6 +114,7 @@ function Peer(calls, messages, auth, connection) {
 	/**
 	 * @typedef {Object} Peer~PendingCall
 	 * @property {Function} callback
+	 * @property {Call} call
 	 * @property {?Timer} timer - timeout timer
 	 */
 
@@ -134,8 +135,6 @@ function Peer(calls, messages, auth, connection) {
 require('util').inherits(Peer, require('events').EventEmitter)
 module.exports = Peer
 
-var Data = require('./Data'),
-	types = require('./types')
 FrameEncoder = require('./FrameEncoder')
 
 /**
@@ -143,7 +142,6 @@ FrameEncoder = require('./FrameEncoder')
  * @enum {number}
  */
 Peer.ERROR = {
-	OTHER: 0,
 	TIMEOUT: -1,
 	CLOSED: -2
 }
@@ -170,7 +168,7 @@ Peer.prototype.canCall = function (name) {
  * @param {function(?Error,*)} callback - required
  */
 Peer.prototype.call = function (name, data, timeout, callback) {
-	var that = this
+	var sequenceId, timer
 
 	if (typeof data === 'function') {
 		callback = data
@@ -183,37 +181,45 @@ Peer.prototype.call = function (name, data, timeout, callback) {
 		throw new TypeError('A callback must be supplied. ' +
 			'If no response is expected, you should send messages, not make calls')
 	}
-	data = data === undefined ? null : data
 
 	var localCall = this._calls.local.map[name]
 	if (this.closed) {
-		return asyncError('Connection is closed', Peer.ERROR.CLOSED)
+		return asyncError(this._createLocalError('Connection is closed', Peer.ERROR.CLOSED))
+	} else if (!this.handshakeDone) {
+		return asyncError(this._createLocalError('Connection is not ready'))
 	} else if (!localCall) {
-		return asyncError('Local call ' + name + ' not found. Have you added it?', Peer.ERROR.OTHER)
+		return asyncError(this._createLocalError('Local call ' + name + ' not found'))
 	} else if (!this.canCall(name)) {
-		return asyncError('The remote does not give support for call ' + name, Peer.ERROR.OTHER)
-	} else if (localCall.input && data === null) {
-		return asyncError('This call expects some input, null was given', Peer.ERROR.OTHER)
-	} else if (!localCall.input && data !== null) {
-		return asyncError('This call does not expect input, but got ' + data, Peer.ERROR.OTHER)
+		return asyncError(this._createLocalError('The remote does not give support for call ' + name))
 	}
+
+	sequenceId = this._pendingCalls.length
 
 	// Encode the data
 	try {
-		data = data === null ? new Buffer(0) : localCall.input.write(data)
+		this._encoder.doCall(sequenceId, localCall.id, data, localCall.input)
 	} catch (e) {
-		return asyncError(e.message, Peer.ERROR.OTHER)
+		e.isLocal = true
+		return asyncError(e)
 	}
 
-	this._doCall(localCall.id, data, timeout, callback)
+	// Set timeout
+	if (timeout) {
+		timer = setTimeout(this._timeoutCall.bind(this, sequenceId), timeout)
+	}
+
+	// Save call info
+	this._pendingCalls.push({
+		callback: callback,
+		call: localCall,
+		timer: timer
+	})
 
 	/**
 	 * Mixing async and sync is a bad idea, so we make sure the callback is called async-ly
-	 * @param {string} message
-	 * @param {number} code
+	 * @param {Error} err
 	 */
-	function asyncError(message, code) {
-		var err = that._createLocalError(message, code)
+	function asyncError(err) {
 		process.nextTick(function () {
 			callback(err)
 		})
@@ -230,43 +236,38 @@ Peer.prototype.canSend = function (name) {
 
 /**
  * Send a message to the other side (remote)
+ * This is a fire-and-forget operation, any error will not be informed
+ * If it is important to know whether the remote has received the message, consider using calls
+ * By default (strict=false), no feedback is given
  * @param {string} name - message name
  * @param {*} [data] - must follow the message format
+ * @param {boolean} [strict=false] - whether to throw error if the operation is invalid
+ * @throws if strict and some error occurs locally
  */
-Peer.prototype.send = function (name, data) {
+Peer.prototype.send = function (name, data, strict) {
+	var localMessage = this._messages.local.map[name]
 
-}
+	if (strict) {
+		// Strick checks
+		if (this.closed) {
+			throw new Error('Connection is closed')
+		} else if (!this.handshakeDone) {
+			throw new Error('Connection is not ready')
+		} else if (!localMessage) {
+			throw new Error('Local message ' + name + ' not found. Have you added it?')
+		} else if (!this.canSend(name)) {
+			throw new Error('The remote does not give support for message ' + name)
+		}
 
-/**
- * @param {number} id
- * @param {Buffer} data
- * @param {number} timeout
- * @param {Function} callback
- * @private
- */
-Peer.prototype._doCall = function (id, data, timeout, callback) {
-	var sequenceId = this._pendingCalls.length,
-		frame = new Data,
-		timer
-
-	// Create the call frame
-	// 0x00 <sid:uint> <id:uint> <data>
-	frame.writeUInt8(0)
-	types.uint.write(sequenceId, frame)
-	types.uint.write(id, frame)
-	frame.appendBuffer(data)
-	this._connection.sendFrame(frame.toBuffer())
-
-	// Set timeout
-	if (timeout) {
-		timer = setTimeout(this._timeoutCall.bind(this, sequenceId), timeout)
+		// Encode and send (let errors be thrown)
+		this._encoder.doSend(localMessage.id, data, localMessage.input)
+	} else {
+		try {
+			this._encoder.doSend(localMessage.id, data, localMessage.input)
+		} catch (e) {
+			// Ignore encoding errors on non-strict mode
+		}
 	}
-
-	// Save call data
-	this._pendingCalls.push({
-		callback: callback,
-		timer: timer
-	})
 }
 
 /**
@@ -278,7 +279,7 @@ Peer.prototype._timeoutCall = function (sid) {
 	var pendingCall = this._pendingCalls[sid]
 	if (pendingCall) {
 		delete this._pendingCalls[sid]
-		pendingCall.callback(this._createLocalError('Timed out', Peer.ERROR.TIMEOUT))
+		pendingCall.callback.call(this, this._createLocalError('Timed out', Peer.ERROR.TIMEOUT))
 	}
 }
 
@@ -290,33 +291,42 @@ Peer.prototype._processFrame = function (frame) {
 	try {
 		this._encoder.processFrame(frame)
 	} catch (e) {
-		return this._error(e)
+		this._error(e)
 	}
 }
 
 /**
+ * Emit an error event and close the connection
  * @param {Error} error
  * @private
  */
 Peer.prototype._error = function (error) {
 	this._close()
+
+	/**
+	 * @event Peer#error
+	 * @type {Error}
+	 */
 	this.emit('error', error)
 }
 
 /**
  * @param {string} message
- * @param {number} code - protocol errors are negative
+ * @param {number} [code] - protocol errors are negative
  * @return {Error}
  * @private
  */
 Peer.prototype._createLocalError = function (message, code) {
 	var err = new Error(message)
 	err.isLocal = true
-	err.code = code
+	if (code) {
+		err.code = code
+	}
 	return err
 }
 
 /**
+ * Close the connection and drop all pending calls
  * @private
  */
 Peer.prototype._close = function () {
@@ -326,7 +336,8 @@ Peer.prototype._close = function () {
 
 		// Send closed error to all pending calls
 		this._pendingCalls.forEach(function (pendingCall) {
-			pendingCall.callback(this._createLocalError('Connection has closed', Peer.ERROR.CLOSED))
+			var err = this._createLocalError('Connection has closed', Peer.ERROR.CLOSED)
+			pendingCall.callback.call(this, err)
 			pendingCall.timer && clearTimeout(pendingCall.timer)
 		}, this)
 		this._pendingCalls = []
@@ -418,7 +429,23 @@ Peer.prototype._processHandshake = function (data) {
  * @private
  */
 Peer.prototype._processCall = function (sid, id, data) {
+	var remoteCall = this._calls.remote.map[id],
+		inputData = null,
+		done
+	if (!remoteCall || !remoteCall.handler) {
+		return this._encoder.doAnswerError(sid, 'Not implemented')
+	}
 
+	if (remoteCall.input) {
+		try {
+			inputData = remoteCall.input.read(data)
+		} catch (e) {
+			return this._encoder.doAnswerError(sid, 'Invalid input data')
+		}
+	}
+
+	done = this._encoder.doAnswer.bind(this._encoder, sid, remoteCall.output)
+	remoteCall.handler.call(this, inputData, done)
 }
 
 /**
@@ -428,7 +455,23 @@ Peer.prototype._processCall = function (sid, id, data) {
  * @private
  */
 Peer.prototype._processMessage = function (id, data) {
+	var remoteMessage = this._messages.remote.map[id],
+		inputData = null
+	if (!remoteMessage || !remoteMessage.handler) {
+		// Not implemented
+		return
+	}
 
+	if (remoteMessage.input) {
+		try {
+			inputData = remoteMessage.input.read(data)
+		} catch (e) {
+			// Encoding errors are ignored for messages
+			return
+		}
+	}
+
+	remoteMessage.handler.call(this, inputData)
 }
 
 /**
@@ -438,6 +481,27 @@ Peer.prototype._processMessage = function (id, data) {
  * @private
  */
 Peer.prototype._processResponse = function (sid, data) {
+	var pendingCall = this._pendingCalls[sid],
+		outputData = null
+	if (!pendingCall) {
+		// Not found (may have been already answered)
+		return
+	}
+
+	// Remove it from the list of pending calls
+	delete this._pendingCalls[sid]
+	pendingCall.timer && clearTimeout(pendingCall.timer)
+
+	if (pendingCall.call.output) {
+		try {
+			outputData = pendingCall.call.output.read(data)
+		} catch (e) {
+			e.isLocal = true
+			return pendingCall.callback.call(this, e)
+		}
+	}
+
+	pendingCall.callback.call(this, null, outputData)
 
 }
 
@@ -449,5 +513,22 @@ Peer.prototype._processResponse = function (sid, data) {
  * @private
  */
 Peer.prototype._processError = function (sid, reason, code) {
+	var pendingCall = this._pendingCalls[sid],
+		err
+	if (!pendingCall) {
+		// Not found (may have been already answered)
+		return
+	}
 
+	// Remove it from the list of pending calls
+	delete this._pendingCalls[sid]
+	pendingCall.timer && clearTimeout(pendingCall.timer)
+
+	// Call with error
+	err = new Error(reason)
+	err.isLocal = false
+	if (code) {
+		err.code = code
+	}
+	pendingCall.callback.call(this, err)
 }

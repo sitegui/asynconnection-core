@@ -69,12 +69,21 @@ Type.basicTypes = [
 /**
  * @param {*} value
  * @return {Buffer}
- * @throws - if the value is invalid
+ * @throws if the value is invalid
  */
-Type.prototype.write = function (value) {
+Type.prototype.writeIntoBuffer = function (value) {
 	var data = new Data
 	this._write(value, data, '')
 	return data.toBuffer()
+}
+
+/**
+ * @param {*} value
+ * @param {Data} data
+ * @throws if the value is invalid
+ */
+Type.prototype.write = function (value, data) {
+	this._write(value, data, '')
 }
 
 /**

@@ -25,7 +25,8 @@ module.exports = FrameEncoder
 
 var Type = require('./Type'),
 	ReadState = require('./ReadState'),
-	types = require('./types')
+	types = require('./types'),
+	Data = require('./Data')
 
 /**
  * @property {Type}
@@ -84,7 +85,109 @@ FrameEncoder.prototype.doHandshake = function (auth, calls, messages) {
 		})
 	}
 
-	this._connection.sendFrame(FrameEncoder._handshakeType.write(data))
+	this._connection.sendFrame(FrameEncoder._handshakeType.writeIntoBuffer(data))
+}
+
+/**
+ * Generate the call frame and send it
+ * @param {number} sid
+ * @param {number} id
+ * @param {?*} data
+ * @param {?Type} type
+ * @throws if badly formatted data
+ */
+FrameEncoder.prototype.doCall = function (sid, id, data, type) {
+	// 0x00 <sid:uint> <id:uint> <data>
+	var frame = new Data
+	frame.writeUInt8(0)
+	types.uint.write(sid, frame)
+	types.uint.write(id, frame)
+	if (type !== null) {
+		type.write(data, frame)
+	}
+	this._connection.sendFrame(frame.toBuffer())
+}
+
+/**
+ * Generate the message frame and send it
+ * @param {number} id
+ * @param {?*} data
+ * @param {?Type} type
+ * @throws if badly formatted data
+ */
+FrameEncoder.prototype.doSend = function (id, data, type) {
+	// 0x01 <id:uint> <data>
+	var frame = new Data
+	frame.writeUInt8(1)
+	types.uint.write(id, frame)
+	if (type !== null) {
+		type.write(data, frame)
+	}
+	this._connection.sendFrame(frame.toBuffer())
+}
+
+/**
+ * Generate the answer frame and send it
+ * This function was designed to be binded:
+ * doAnswer.bind(frameEncoder, sid, type)
+ * to act like an async callback function(err,response)
+ * @param {number} sid
+ * @param {?Type} type
+ * @param {?Error} err
+ * @param {*} data
+ */
+FrameEncoder.prototype.doAnswer = function (sid, type, err, data) {
+	var reason, code
+	if (err) {
+		reason = String(err.message || err)
+		code = typeof err.code === 'number' && err.code > 0 ? err.code : 0
+		return this.doAnswerError(sid, reason, code)
+	}
+	this.doAnswerSuccess(sid, data, type)
+}
+
+/**
+ * Generate the answer frame and send it
+ * If any enconding errors occur:
+ * * the call will be answer with error instead and
+ * * 'error' event will be fired on Peer
+ * @param {number} sid
+ * @param {*} data
+ * @param {Type} type
+ */
+FrameEncoder.prototype.doAnswerSuccess = function (sid, data, type) {
+	// 0x02 <sid:uint> <data>
+	var frame = new Data
+	frame.writeUInt8(2)
+	types.uint.write(sid, frame)
+	if (type !== null) {
+		try {
+			type.write(data, frame)
+		} catch (e) {
+			// Answer with error and fire 'error' event
+			this.doAnswerError(sid, 'Encoding error', 0)
+			return this._peer.emit('error', e)
+		}
+	}
+	this._connection.sendFrame(frame.toBuffer())
+}
+
+/**
+ * Generate the answer frame and send it
+ * @param {number} sid
+ * @param {string} reason
+ * @param {number} [code=0]
+ */
+FrameEncoder.prototype.doAnswerError = function (sid, reason, code) {
+	// 0x03 <sid:uint> <data>
+	var frame = new Data
+	frame.writeUInt8(3)
+	types.uint.write(sid, frame)
+	FrameEncoder._errorType.write({
+		reason: reason,
+		code: code || 0
+	}, frame)
+	this._connection.sendFrame(frame.toBuffer())
 }
 
 /**
