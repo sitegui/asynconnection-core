@@ -1,8 +1,8 @@
 /*globals describe, it*/
 'use strict'
 
-require('should')
-var Type = require('../lib/Type')
+var Type = require('../lib/Type'),
+	should = require('should')
 
 describe('Type', function () {
 	var myType
@@ -49,5 +49,40 @@ describe('Type', function () {
 				}
 			}]
 		})
+	})
+
+	it('should not encode a non conforming object', function () {
+		should(function () {
+			myType.writeIntoBuffer(12)
+		}).throw()
+
+		should(function () {
+			myType.writeIntoBuffer({
+				a: 17,
+				b: [],
+				c: [{
+					d: true
+				}]
+			})
+		}).throw()
+	})
+
+	var obj = {
+			a: 22,
+			b: [-3, 14, -15, 92, -65, 35],
+			c: [{
+				d: 'Hello World'
+			}, {}, {
+				d: '?'
+			}]
+		},
+		encoded
+
+	it('should encode a conforming object', function () {
+		encoded = myType.writeIntoBuffer(obj)
+	})
+
+	it('should read back the data', function () {
+		myType.read(encoded).should.be.eql(obj)
 	})
 })
