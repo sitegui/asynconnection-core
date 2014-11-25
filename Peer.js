@@ -3,6 +3,9 @@
 var FrameEncoder
 
 /**
+ * Represent one of the sides in the protocol.
+ * This class exposes most of the interface the final user will interact with
+ * NOTE: This class should not instantiated directly. See {@link Context#_createPeer}
  * @class
  * @extends EventEmitter
  * @param {Object} calls

@@ -1,18 +1,18 @@
 'use strict'
 
 /**
- * Represent a collection of registered calls and messages
- * Many peers can be linked to a context
+ * A collection of registered calls and messages.
+ * Many `peers` can be linked to a context.
  * @class
  */
 function Context() {
 	/**
 	 * @member {Object}
 	 * @property {Object} client
-	 * @property {Object<Call>} client.map
+	 * @property {Object<Call>} client.map - map from call name and call id
 	 * @property {Array<Call>} client.list
 	 * @property {Object} server
-	 * @property {Object<Call>} server.map
+	 * @property {Object<Call>} server.map - map from call name and call id
 	 * @property {Array<Call>} server.list
 	 * @private
 	 */
@@ -30,10 +30,10 @@ function Context() {
 	/**
 	 * @member {Object}
 	 * @property {Object} client
-	 * @property {Object<Message>} client.map
+	 * @property {Object<Message>} client.map - map from message name and message id
 	 * @property {Array<Message>} client.list
 	 * @property {Object} server
-	 * @property {Object<Message>} server.map
+	 * @property {Object<Message>} server.map - map from message name and message id
 	 * @property {Array<Message>} server.list
 	 * @private
 	 */
@@ -52,7 +52,8 @@ function Context() {
 module.exports = Context
 
 var Call = require('./Call'),
-	Message = require('./Message')
+	Message = require('./Message'),
+	Peer = require('./Peer')
 
 /**
  * Register a call a client can send to a server
@@ -130,4 +131,23 @@ Context.prototype.addServerMessage = function (id, name, input, handler) {
 	}
 
 	list.push(map[id] = map[name] = new Message(id, name, input, handler))
+}
+
+/**
+ * Create a peer from this context
+ * This is intended to be called by the fragmentation layer
+ * @param {Object} auth
+ * @param {string} [auth.user='']
+ * @param {string} [auth.password='']
+ * @param {boolean} [auth.required=false] - if true, will require remote authentication
+ * @param {Connection} connection
+ * @return {Peer}
+ * @private
+ */
+Context.prototype._createPeer = function (auth, connection) {
+	return new Peer({
+
+	}, {
+
+	}, auth, connection)
 }

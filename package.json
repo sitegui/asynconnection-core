@@ -16,7 +16,7 @@
 	},
 	"scripts": {
 		"test": "mocha test",
-		"doc": "jsdoc -p ."
+		"docs": "jsdoc -d docs -c docs.json . && jsdoc -p -d docs_private -c docs.json ."
 	},
 	"devDependencies": {
 		"jsdoc": "^3.3.0-alpha10",
