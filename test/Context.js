@@ -32,4 +32,19 @@ describe('Context', function () {
 			cntxt.addServerCall(3, 'random', null, 'int')
 		}).throw()
 	})
+
+	it('should create a Peer', function () {
+		var conn = {
+				// Mock
+				on: function () {},
+				sendFrame: function () {}
+			},
+			serverPeer = cntxt._createPeer(true, {}, conn),
+			clientPeer = cntxt._createPeer(false, {}, conn)
+		serverPeer._calls.local.list.should.be.equal(cntxt._calls.server.list)
+		serverPeer._calls.remote.list.should.be.equal(cntxt._calls.client.list)
+
+		clientPeer._calls.local.list.should.be.equal(cntxt._calls.client.list)
+		clientPeer._calls.remote.list.should.be.equal(cntxt._calls.server.list)
+	})
 })
