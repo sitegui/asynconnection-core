@@ -1,10 +1,10 @@
 /*globals describe, it*/
 'use strict'
 
-var types = require('../types'),
-	Data = require('../Data'),
+var types = require('../lib/types'),
+	Data = require('../lib/Data'),
 	should = require('should'),
-	ReadState = require('../ReadState'),
+	ReadState = require('../lib/ReadState'),
 	uintValues = require('./uint.json'),
 	intValues = require('./int.json')
 

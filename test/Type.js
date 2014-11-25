@@ -2,7 +2,7 @@
 'use strict'
 
 require('should')
-var Type = require('../Type')
+var Type = require('../lib/Type')
 
 describe('Type', function () {
 	var myType
