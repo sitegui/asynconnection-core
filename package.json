@@ -16,9 +16,10 @@
 	},
 	"scripts": {
 		"test": "mocha test",
-		"docs": "jsdoc -d docs -c docs.json . && jsdoc -p -d docs_private -c docs.json ."
+		"docs": "jsdoc -d docs -c docs.json lib && jsdoc -p -d docs_private -c docs.json lib"
 	},
 	"devDependencies": {
+		"ink-docstrap": "^0.4.12",
 		"jsdoc": "^3.3.0-alpha10",
 		"mocha": "^2.0.1",
 		"should": "^4.3.0"

@@ -4,7 +4,9 @@
 	"plugins": [
 		"plugins/markdown"
 	],
-	"templates": {},
+	"templates": {
+		"theme": "readable"
+	},
 	"markdown": {
 		"parser": "gfm"
 	}
