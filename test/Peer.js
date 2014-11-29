@@ -2,51 +2,37 @@
 'use strict'
 
 var Context = require('../lib/Context'),
-	EventEmitter = require('events').EventEmitter,
-	should = require('should')
+	MockConnection = require('./utils/MockConnection')
 
 describe('Peer', function () {
-	// Mock connection
-	var clientConn = new EventEmitter,
-		serverConn = new EventEmitter
-	clientConn.frames = []
-	serverConn.frames = []
-	clientConn.sendFrame = serverConn.sendFrame = function (frame) {
-		console.log(frame)
-		this.frames.push(frame)
-	}
-	clientConn.getLastFrame = serverConn.getLastFrame = function () {
-		return this.frames.pop()
-	}
-	clientConn.close = serverConn.close = function () {}
-
 	// Prepare context
 	var cntxt = new Context
 	cntxt.addClientCall(1, 'add', {
 		a: 'int',
 		b: 'int'
-	}, 'int')
+	}, 'int', function () {
+		console.log('hi')
+	})
 
 	describe('invalid authentication', function () {
 		// In this example, the client requires the server to authenticate
 		// Since the server doesn't do this, the connection is closed right after the handshake
 
-		// Create peer
-		var client = cntxt._createPeer(false, {
+		// Create peers
+		var clientConn = new MockConnection,
+			serverConn = new MockConnection,
+			client = cntxt._createPeer(false, {
 				user: 'user',
 				password: 'pass',
 				required: true
 			}, clientConn),
 			server = cntxt._createPeer(true, {}, serverConn)
 
-		var clientHandshake, serverHandshake
 		it('should send the handshake', function () {
-			clientHandshake = clientConn.getLastFrame()
-			serverHandshake = serverConn.getLastFrame()
-			clientHandshake.should.be.a.Buffer
-			serverHandshake.should.be.a.Buffer
-			client.handshakeDone.should.be.false
-			server.handshakeDone.should.be.false
+			clientConn.lastFrame().should.be.a.Buffer
+			clientConn.lastFrame().should.be.a.Buffer
+			client._handshakeReceived.should.be.false
+			server._handshakeReceived.should.be.false
 		})
 
 		it('should end the handshake and close the connection', function () {
@@ -57,11 +43,102 @@ describe('Peer', function () {
 			server.once('error', function () {
 				errors++
 			})
-			clientConn.emit('frame', serverHandshake)
-			serverConn.emit('frame', clientHandshake)
+
+			MockConnection.link(clientConn, serverConn)
+			client._handshakeReceived.should.be.true
+			server._handshakeReceived.should.be.true
 			client.closed.should.be.true
 			server.closed.should.be.true
 			errors.should.be.equal(2)
 		})
+	})
+
+	describe('no authentication', function () {
+		it('should be simple to connect without auth', function () {
+			var clientConn = new MockConnection,
+				serverConn = new MockConnection,
+				client = cntxt._createPeer(false, {}, clientConn),
+				server = cntxt._createPeer(true, {}, serverConn)
+			MockConnection.link(clientConn, serverConn)
+
+			client.handshakeDone.should.be.true
+			server.handshakeDone.should.be.true
+			client.closed.should.be.false
+			server.closed.should.be.false
+		})
+	})
+
+	describe('using auth handler', function () {
+		it('should be able to check credentials and block the connection', function (done) {
+			var clientConn = new MockConnection,
+				serverConn = new MockConnection,
+				client = cntxt._createPeer(false, {
+					user: 'u',
+					password: 'p'
+				}, clientConn),
+				server = cntxt._createPeer(true, {
+					required: true,
+					handler: function (auth, done) {
+						auth.remoteUser.should.be.equal('u')
+						auth.remotePassword.should.be.equal('p')
+						this.should.be.equal(server)
+						setTimeout(function () {
+							done(new Error('Invalid credentials, for some reason'))
+						}, 10)
+						server.handshakeDone.should.be.false
+						client.handshakeDone.should.be.false
+					}
+				}, serverConn)
+			MockConnection.link(clientConn, serverConn)
+			client.handshakeDone.should.be.true
+			client.call('add', {
+				a: 12,
+				b: 13
+			}, function () {
+				console.log(arguments)
+			})
+
+			server.on('error', function (err) {
+				server.handshakeDone.should.be.true
+				client.handshakeDone.should.be.true
+				server.closed.should.be.true
+				err.message.should.be.equal('Invalid credentials, for some reason')
+				done()
+			})
+		})
+
+		it('should be able to check credentials and allow the connection', function (done) {
+			var clientConn = new MockConnection,
+				serverConn = new MockConnection,
+				client = cntxt._createPeer(false, {
+					user: 'u',
+					password: 'p'
+				}, clientConn),
+				server = cntxt._createPeer(true, {
+					required: true,
+					handler: function (auth, done) {
+						auth.remoteUser.should.be.equal('u')
+						auth.remotePassword.should.be.equal('p')
+						this.should.be.equal(server)
+						setTimeout(function () {
+							done()
+						}, 10)
+						server.handshakeDone.should.be.false
+						client.handshakeDone.should.be.false
+					}
+				}, serverConn)
+			MockConnection.link(clientConn, serverConn)
+
+			server.on('connect', function () {
+				server.handshakeDone.should.be.true
+				client.handshakeDone.should.be.true
+				server.closed.should.be.false
+				done()
+			})
+		})
+	})
+
+	describe('using no auth handler', function () {
+
 	})
 })
