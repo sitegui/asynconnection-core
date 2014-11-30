@@ -2,6 +2,7 @@
 'use strict'
 
 var Type = require('../lib/Type'),
+	ReadState = require('../lib/ReadState'),
 	should = require('should')
 
 describe('Type', function () {
@@ -83,6 +84,6 @@ describe('Type', function () {
 	})
 
 	it('should read back the data', function () {
-		myType.read(encoded).should.be.eql(obj)
+		myType.read(new ReadState(encoded)).should.be.eql(obj)
 	})
 })
