@@ -82,33 +82,29 @@ describe('Peer', function () {
 				}, clientConn),
 				server = cntxt._createPeer(true, {
 					required: true,
-					handler: function (auth, done) {
-						auth.remoteUser.should.be.equal('u')
-						auth.remotePassword.should.be.equal('p')
+					handler: function (user, password, done) {
+						user.should.be.equal('u')
+						password.should.be.equal('p')
 						this.should.be.equal(server)
+						server.handshakeDone.should.be.false
+						client.handshakeDone.should.be.false
 						setTimeout(function () {
 							done(new Error('Invalid credentials, for some reason'))
 						}, 10)
-						server.handshakeDone.should.be.false
-						client.handshakeDone.should.be.false
 					}
-				}, serverConn)
+				}, serverConn),
+				half = false,
+				cb = function () {
+					this.closed.should.be.true
+					if (!half) {
+						return (half = true)
+					}
+					done()
+				}
 			MockConnection.link(clientConn, serverConn)
-			client.handshakeDone.should.be.true
-			client.call('add', {
-				a: 12,
-				b: 13
-			}, function () {
-				console.log(arguments)
-			})
 
-			server.on('error', function (err) {
-				server.handshakeDone.should.be.true
-				client.handshakeDone.should.be.true
-				server.closed.should.be.true
-				err.message.should.be.equal('Invalid credentials, for some reason')
-				done()
-			})
+			server.on('error', cb)
+			client.on('error', cb)
 		})
 
 		it('should be able to check credentials and allow the connection', function (done) {
@@ -120,25 +116,30 @@ describe('Peer', function () {
 				}, clientConn),
 				server = cntxt._createPeer(true, {
 					required: true,
-					handler: function (auth, done) {
-						auth.remoteUser.should.be.equal('u')
-						auth.remotePassword.should.be.equal('p')
+					handler: function (user, password, done) {
+						user.should.be.equal('u')
+						password.should.be.equal('p')
 						this.should.be.equal(server)
+						server.handshakeDone.should.be.false
+						client.handshakeDone.should.be.false
 						setTimeout(function () {
 							done()
 						}, 10)
-						server.handshakeDone.should.be.false
-						client.handshakeDone.should.be.false
 					}
-				}, serverConn)
+				}, serverConn),
+				half = false,
+				cb = function () {
+					this.closed.should.be.false
+					this.handshakeDone.should.be.true
+					if (!half) {
+						return (half = true)
+					}
+					done()
+				}
 			MockConnection.link(clientConn, serverConn)
 
-			server.on('connect', function () {
-				server.handshakeDone.should.be.true
-				client.handshakeDone.should.be.true
-				server.closed.should.be.false
-				done()
-			})
+			server.on('connect', cb)
+			client.on('connect', cb)
 		})
 	})
 
