@@ -16,7 +16,7 @@
 	},
 	"scripts": {
 		"test": "mocha test -b",
-		"docs": "jsdoc -d docs -c docs.json lib && jsdoc -p -d docs_private -c docs.json lib"
+		"docs": "jsdoc -d docs -c docs.json -t node_modules/ink-docstrap/template lib && jsdoc -p -d docs_private -c docs.json -t node_modules/ink-docstrap/template lib"
 	},
 	"devDependencies": {
 		"ink-docstrap": "^0.4.12",

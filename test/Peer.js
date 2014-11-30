@@ -55,12 +55,19 @@ describe('Peer', function () {
 		it('should accept any non-empty user/password', function (done) {
 			var clientConn = new MockConnection,
 				serverConn = new MockConnection,
-				client = cntxt._createPeer(false, {}, clientConn),
-				server = cntxt._createPeer(true, {}, serverConn),
+				client = cntxt._createPeer(false, {
+					user: 'u',
+					password: 'p'
+				}, clientConn),
+				server = cntxt._createPeer(true, {
+					required: true
+				}, serverConn),
 				half = false,
 				cb = function () {
 					this.closed.should.be.false
 					this.handshakeDone.should.be.true
+					server.auth.remoteUser.should.be.equal('u')
+					client.auth.user.should.be.equal('u')
 					if (!half) {
 						return (half = true)
 					}
@@ -141,9 +148,5 @@ describe('Peer', function () {
 			server.on('connect', cb)
 			client.on('connect', cb)
 		})
-	})
-
-	describe('using no auth handler', function () {
-
 	})
 })
