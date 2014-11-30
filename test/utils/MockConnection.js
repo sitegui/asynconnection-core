@@ -26,24 +26,42 @@ MockConnection.link = function (a, b) {
 
 	a.on('_sendFrame', function (frame) {
 		if (!lockA) {
-			b.emit('frame', frame)
+			process.nextTick(function () {
+
+				b.emit('frame', frame)
+
+			})
 		}
 	})
 	b.on('_sendFrame', function (frame) {
 		if (!lockB) {
-			a.emit('frame', frame)
+			process.nextTick(function () {
+				a.emit('frame', frame)
+			})
 		}
+	})
+	a.on('close', function () {
+		process.nextTick(function () {
+			b.close()
+		})
+	})
+	b.on('close', function () {
+		process.nextTick(function () {
+			a.close()
+		})
 	})
 
 	// Send previous frames
-	for (i = 0; i < a.frames.length; i++) {
-		b.emit('frame', a.frames[i])
-	}
-	lockA = false
-	for (i = 0; i < b.frames.length; i++) {
-		a.emit('frame', b.frames[i])
-	}
-	lockB = false
+	process.nextTick(function () {
+		for (i = 0; i < a.frames.length; i++) {
+			b.emit('frame', a.frames[i])
+		}
+		lockA = false
+		for (i = 0; i < b.frames.length; i++) {
+			a.emit('frame', b.frames[i])
+		}
+		lockB = false
+	})
 }
 
 MockConnection.prototype.sendFrame = function (frame) {
