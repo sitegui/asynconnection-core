@@ -21,24 +21,29 @@ module.exports = MockConnection
  * @param {MockConnection} b
  */
 MockConnection.link = function (a, b) {
-	var lenA, lenB, i
+	var i, lockA = true,
+		lockB = true
 
 	a.on('_sendFrame', function (frame) {
-		b.emit('frame', frame)
+		if (!lockA) {
+			b.emit('frame', frame)
+		}
 	})
 	b.on('_sendFrame', function (frame) {
-		a.emit('frame', frame)
+		if (!lockB) {
+			a.emit('frame', frame)
+		}
 	})
 
 	// Send previous frames
-	lenA = a.frames.length
-	lenB = b.frames.length
-	for (i = 0; i < lenA; i++) {
+	for (i = 0; i < a.frames.length; i++) {
 		b.emit('frame', a.frames[i])
 	}
-	for (i = 0; i < lenB; i++) {
+	lockA = false
+	for (i = 0; i < b.frames.length; i++) {
 		a.emit('frame', b.frames[i])
 	}
+	lockB = false
 }
 
 MockConnection.prototype.sendFrame = function (frame) {
@@ -51,8 +56,4 @@ MockConnection.prototype.close = function () {
 		this.closed = true
 		this.emit('close')
 	}
-}
-
-MockConnection.prototype.lastFrame = function () {
-	return this.frames[this.frames.length - 1]
 }

@@ -2,57 +2,18 @@
 'use strict'
 
 var Context = require('../lib/Context'),
-	MockConnection = require('./utils/MockConnection')
+	MockConnection = require('./utils/MockConnection'),
+	cntxt = new Context
+
+// Prepare context
+cntxt.addClientCall(1, 'add', {
+	a: 'int',
+	b: 'int'
+}, 'int', function (data, done) {
+	done(null, data.a + data.b)
+})
 
 describe('Peer', function () {
-	// Prepare context
-	var cntxt = new Context
-	cntxt.addClientCall(1, 'add', {
-		a: 'int',
-		b: 'int'
-	}, 'int', function () {
-		console.log('hi')
-	})
-
-	describe('invalid authentication', function () {
-		// In this example, the client requires the server to authenticate
-		// Since the server doesn't do this, the connection is closed right after the handshake
-
-		// Create peers
-		var clientConn = new MockConnection,
-			serverConn = new MockConnection,
-			client = cntxt._createPeer(false, {
-				user: 'user',
-				password: 'pass',
-				required: true
-			}, clientConn),
-			server = cntxt._createPeer(true, {}, serverConn)
-
-		it('should send the handshake', function () {
-			clientConn.lastFrame().should.be.a.Buffer
-			clientConn.lastFrame().should.be.a.Buffer
-			client._handshakeReceived.should.be.false
-			server._handshakeReceived.should.be.false
-		})
-
-		it('should end the handshake and close the connection', function () {
-			var errors = 0
-			client.once('error', function () {
-				errors++
-			})
-			server.once('error', function () {
-				errors++
-			})
-
-			MockConnection.link(clientConn, serverConn)
-			client._handshakeReceived.should.be.true
-			server._handshakeReceived.should.be.true
-			client.closed.should.be.true
-			server.closed.should.be.true
-			errors.should.be.equal(2)
-		})
-	})
-
 	describe('no authentication', function () {
 		it('should be simple to connect without auth', function () {
 			var clientConn = new MockConnection,
@@ -60,11 +21,54 @@ describe('Peer', function () {
 				client = cntxt._createPeer(false, {}, clientConn),
 				server = cntxt._createPeer(true, {}, serverConn)
 			MockConnection.link(clientConn, serverConn)
-
 			client.handshakeDone.should.be.true
 			server.handshakeDone.should.be.true
 			client.closed.should.be.false
 			server.closed.should.be.false
+		})
+	})
+
+	describe('required authentication', function () {
+		// In this example, the server requires the client to authenticate
+		// Since the client doesn't do this, the connection is closed right after the handshake
+
+		it('should end the handshake and close the connection if no auth is given', function (done) {
+			var clientConn = new MockConnection,
+				serverConn = new MockConnection,
+				client = cntxt._createPeer(false, {}, clientConn),
+				server = cntxt._createPeer(true, {
+					required: true
+				}, serverConn),
+				half = false,
+				cb = function () {
+					this.closed.should.be.true
+					if (!half) {
+						return (half = true)
+					}
+					done()
+				}
+			client.on('error', cb)
+			server.on('error', cb)
+			MockConnection.link(clientConn, serverConn)
+		})
+
+		it('should accept any non-empty user/password', function (done) {
+			var clientConn = new MockConnection,
+				serverConn = new MockConnection,
+				client = cntxt._createPeer(false, {}, clientConn),
+				server = cntxt._createPeer(true, {}, serverConn),
+				half = false,
+				cb = function () {
+					this.closed.should.be.false
+					this.handshakeDone.should.be.true
+					if (!half) {
+						return (half = true)
+					}
+					done()
+				}
+			client.on('connect', cb)
+			server.on('connect', cb)
+			MockConnection.link(clientConn, serverConn)
 		})
 	})
 
