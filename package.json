@@ -2,11 +2,11 @@
 	"name": "asynconnection-core",
 	"version": "0.0.1",
 	"author": "Sitegui <sitegui@sitegui.com.br>",
-	"description": "An async, call-return-throw oriented protocol",
+	"description": "An async, call-and-message oriented protocol",
 	"main": "./index.js",
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/sitegui/async-protocol-core"
+		"url": "https://github.com/sitegui/asynconnection-core"
 	},
 	"keywords": [],
 	"dependencies": {},
@@ -20,8 +20,8 @@
 	},
 	"devDependencies": {
 		"ink-docstrap": "^0.4.12",
-		"jsdoc": "^3.3.0-alpha10",
+		"jsdoc": "^3.3.0-alpha11",
 		"mocha": "^2.0.1",
-		"should": "^4.3.0"
+		"should": "4.3.0"
 	}
 }
