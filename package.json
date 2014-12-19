@@ -1,5 +1,5 @@
 {
-	"name": "async-protocol-core",
+	"name": "asynconnection-core",
 	"version": "0.0.1",
 	"author": "Sitegui <sitegui@sitegui.com.br>",
 	"description": "An async, call-return-throw oriented protocol",
