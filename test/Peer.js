@@ -74,8 +74,8 @@ describe('Peer', function () {
 					}
 					done()
 				}
-			peers.client.on('error', cb)
-			peers.server.on('error', cb)
+			peers.client.once('error', cb)
+			peers.server.once('error', cb)
 		})
 
 		it('should accept any non-empty user/password', function (done) {
@@ -128,8 +128,8 @@ describe('Peer', function () {
 					done()
 				}
 
-			peers.server.on('error', cb)
-			peers.client.on('error', cb)
+			peers.server.once('error', cb)
+			peers.client.once('error', cb)
 		})
 
 		it('should be able to check credentials and allow the connection', function (done) {
@@ -236,6 +236,24 @@ describe('Peer', function () {
 		})
 		createPeers({}, {}, function (client) {
 			client.send('msg', 17)
+		})
+	})
+	
+	it('should alert about bad response format', function (done) {
+		cntxt.addClientCall(3, 'internalError', null, 'uint', function (data, done) {
+			done(null, -2) // not a uint
+		})
+		createPeers({}, {}, function (client, server) {
+			server.once('error', function (err) {
+				err.should.be.an.Error
+				err.message.should.match(/Expected unsigned integer/)
+			})
+			client.call('internalError', function (err) {
+				err.should.be.an.Error
+				err.isLocal.should.be.false
+				err.code.should.be.equal(Peer.ERROR.INTERNAL)
+				done()
+			})
 		})
 	})
 })
