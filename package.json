@@ -1,6 +1,6 @@
 {
 	"name": "asynconnection-core",
-	"version": "0.0.1",
+	"version": "0.1.0",
 	"author": "Sitegui <sitegui@sitegui.com.br>",
 	"description": "An async, call-and-message oriented protocol",
 	"main": "./index.js",
@@ -9,7 +9,9 @@
 		"url": "https://github.com/sitegui/asynconnection-core"
 	},
 	"keywords": [],
-	"dependencies": {},
+	"dependencies": {
+		"js-binary": "^1.0.0"
+	},
 	"license": "MIT",
 	"engines": {
 		"node": ">=0.10"
@@ -22,6 +24,6 @@
 		"ink-docstrap": "^0.4.12",
 		"jsdoc": "^3.3.0-alpha11",
 		"mocha": "^2.0.1",
-		"should": "4.3.0"
+		"should": "^4.4.1"
 	}
 }
