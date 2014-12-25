@@ -122,6 +122,7 @@ describe('Peer', function () {
 				cb = function (err) {
 					err.should.an.Error
 					this.closed.should.be.true
+					err.message.should.containEql('Invalid credentials, for some reason')
 					if (!half) {
 						return (half = true)
 					}

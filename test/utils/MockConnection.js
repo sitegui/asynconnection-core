@@ -3,16 +3,21 @@
  */
 'use strict'
 
+var EventEmitter = require('events').EventEmitter
+
 /**
  * @class
  * @extends EventEmitter
  */
 function MockConnection() {
+	EventEmitter.call(this)
+	
 	this.frames = []
 	this.closed = false
+	this.hasConnected = true
 }
 
-require('util').inherits(MockConnection, require('events').EventEmitter)
+require('util').inherits(MockConnection, EventEmitter)
 module.exports = MockConnection
 
 /**

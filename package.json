@@ -1,6 +1,6 @@
 {
 	"name": "asynconnection-core",
-	"version": "0.1.0",
+	"version": "0.2.0",
 	"author": "Sitegui <sitegui@sitegui.com.br>",
 	"description": "An async, call-and-message oriented protocol",
 	"main": "./index.js",
@@ -18,12 +18,11 @@
 	},
 	"scripts": {
 		"test": "mocha test -b",
-		"docs": "jsdoc -d docs -c docs.json -t node_modules/ink-docstrap/template lib && jsdoc -p -d docs_private -c docs.json -t node_modules/ink-docstrap/template lib"
+		"docs": "jsdoc -d docs -c docs.json lib && jsdoc -p -d docs_private -c docs.json lib"
 	},
 	"devDependencies": {
-		"ink-docstrap": "^0.4.12",
-		"jsdoc": "^3.3.0-alpha11",
-		"mocha": "^2.0.1",
+		"jsdoc": "^3.3.0-alpha13",
+		"mocha": "^2.1.0",
 		"should": "^4.4.1"
 	}
 }

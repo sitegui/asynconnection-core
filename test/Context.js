@@ -2,7 +2,8 @@
 'use strict'
 
 var Context = require('../lib/Context'),
-	should = require('should')
+	should = require('should'),
+	MockConnection = require('./utils/MockConnection')
 
 describe('Context', function () {
 	var cntxt = new Context
@@ -34,11 +35,7 @@ describe('Context', function () {
 	})
 
 	it('should create a Peer', function () {
-		var conn = {
-				// Mock
-				on: function () {},
-				sendFrame: function () {}
-			},
+		var conn = new MockConnection(),
 			serverPeer = cntxt._createPeer(true, {}, conn),
 			clientPeer = cntxt._createPeer(false, {}, conn)
 		serverPeer._calls.local.list.should.be.equal(cntxt._calls.server.list)
