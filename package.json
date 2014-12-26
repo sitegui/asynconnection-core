@@ -10,7 +10,7 @@
 	},
 	"keywords": [],
 	"dependencies": {
-		"js-binary": "^1.0.0"
+		"js-binary": "^1.1.0"
 	},
 	"license": "MIT",
 	"engines": {
