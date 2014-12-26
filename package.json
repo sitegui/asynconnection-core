@@ -1,6 +1,6 @@
 {
   "name": "asynconnection-core",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "author": "Sitegui <sitegui@sitegui.com.br>",
   "description": "An async, call-and-message oriented protocol",
   "main": "./index.js",
