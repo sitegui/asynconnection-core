@@ -1,12 +1,10 @@
 {
-	"tags": {},
-	"source": {},
+	"source": {
+		"include": ["index.js", "lib"]
+	},
 	"plugins": [
 		"plugins/markdown"
 	],
-	"templates": {
-		"theme": "readable"
-	},
 	"markdown": {
 		"parser": "gfm"
 	}
