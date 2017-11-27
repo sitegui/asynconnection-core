@@ -1,4 +1,10 @@
 # Async Connection Core
-Core logic shared by both [`asynconnection-node`](https://github.com/sitegui/asynconnection-node) and [`asynconnection-web`](https://github.com/sitegui/asynconnection-web).
+[![Build Status](https://travis-ci.org/sitegui/asynconnection-core.svg?branch=master)](https://travis-ci.org/sitegui/asynconnection-core)
+[![Inline docs](https://inch-ci.org/github/sitegui/asynconnection-core.svg?branch=master)](https://inch-ci.org/github/sitegui/asynconnection-core)
+[![Dependency Status](https://david-dm.org/sitegui/asynconnection-core.svg)](https://david-dm.org/sitegui/asynconnection-core)
+An async, call-and-message oriented protocol
 
-Please refer to those projects for more info.
+This package implements the core functionality used by [asynconnection](https://www.npmjs.com/package/asynconnection)
+
+# Docs
+All public methods are described in the [generated docs](http://clubedaentrega.github.io/asynconnection-core)
