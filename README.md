@@ -7,4 +7,4 @@ An async, call-and-message oriented protocol
 This package implements the core functionality used by [asynconnection](https://www.npmjs.com/package/asynconnection)
 
 # Docs
-All public methods are described in the [generated docs](http://clubedaentrega.github.io/asynconnection-core)
+All public methods are described in the [generated docs](http://sitegui.github.io/asynconnection-core/)
